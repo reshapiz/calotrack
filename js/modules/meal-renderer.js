@@ -1,289 +1,151 @@
-// js/modules/meal-renderer.js - исправленная версия
+const MEAL_ORDER = [
+    { id: 'breakfast', name: 'Завтрак' },
+    { id: 'lunch', name: 'Обед' },
+    { id: 'snack', name: 'Перекус' },
+    { id: 'dinner', name: 'Ужин' }
+];
 
 class MealRenderer {
     constructor() {
-        this.currentCategory = 'breakfast';
         this.currentMenu = null;
-        this.currentHealthProfile = null;
     }
 
-    renderMenu(menuData, healthProfile) {
+    renderMenu(menuData) {
         this.currentMenu = menuData;
-        this.currentHealthProfile = healthProfile;
-        
+
         const container = document.getElementById('meal-content');
         if (!container) return;
-        
-        if (!menuData || !menuData.meals) {
-            container.innerHTML = `
-                <div class="meal-empty">
-                    <p>Ошибка: не удалось загрузить меню</p>
-                    <p>Попробуйте сгенерировать снова</p>
-                </div>
-            `;
+
+        if (!menuData?.meals) {
+            container.innerHTML = '<p class="meal-empty">Не удалось составить меню. Попробуйте ещё раз.</p>';
             return;
         }
-        
-        const tabsHtml = this.renderTabs();
-        const mealsHtml = this.renderMealGrid(this.currentCategory);
-        
+
+        this.updateTotals();
+
         container.innerHTML = `
-            ${tabsHtml}
-            <div class="meal-grid-container">
-                ${mealsHtml}
-            </div>
+            ${this.renderSummary()}
+            <ol class="meal-day">
+                ${MEAL_ORDER.map((slot) => this.renderSlot(slot)).join('')}
+            </ol>
+            ${this.renderAdvice()}
             <div class="meal-actions">
-                <button class="refresh-meal-btn" id="refresh-meal">
-                    Другой вариант
-                </button>
-                <button class="save-menu-btn" id="save-menu">
-                    Сохранить меню
-                </button>
+                <button class="button button-dark" type="button" id="save-menu">Сохранить меню</button>
             </div>
         `;
-        
-        this.setupTabListeners();
-        this.setupActionListeners();
+
+        this.setupListeners(container);
     }
-    
-    renderTabs() {
-        const categories = [
-            { id: 'breakfast', name: 'Завтрак', percent: 30 },
-            { id: 'snack', name: 'Перекус', percent: 10 },
-            { id: 'lunch', name: 'Обед', percent: 35 },
-            { id: 'dinner', name: 'Ужин', percent: 25 }
-        ];
-        
+
+    updateTotals() {
+        const meals = Object.values(this.currentMenu.meals).filter(Boolean);
+        this.currentMenu.generatedCalories = meals.reduce((sum, meal) => sum + meal.adjustedCalories, 0);
+        this.currentMenu.calorieDifference = this.currentMenu.generatedCalories - this.currentMenu.totalCalories;
+    }
+
+    renderSummary() {
+        const { generatedCalories, totalCalories, calorieDifference } = this.currentMenu;
+        const differenceText = calorieDifference === 0
+            ? 'точно по норме'
+            : `на ${formatNumber(Math.abs(calorieDifference))} ккал ${calorieDifference > 0 ? 'больше' : 'меньше'} нормы`;
+
         return `
-            <div class="meal-tabs">
-                ${categories.map(cat => `
-                    <button class="tab-btn ${this.currentCategory === cat.id ? 'active' : ''}" 
-                            data-category="${cat.id}">
-                        ${cat.name}
-                        <span class="tab-percent">${cat.percent}%</span>
-                    </button>
-                `).join('')}
+            <p class="meal-summary">
+                <strong>${formatNumber(generatedCalories)} ккал</strong> из ${formatNumber(totalCalories)}, ${differenceText}
+            </p>
+        `;
+    }
+
+    renderAdvice() {
+        const advice = this.currentMenu.advice || [];
+        if (advice.length === 0) return '';
+
+        return `
+            <div class="meal-advice">
+                <h3>Что ещё учесть</h3>
+                <ul>${advice.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
             </div>
         `;
     }
-    
-    renderMealGrid(category) {
-        const meal = this.currentMenu?.meals?.[category];
+
+    renderSlot(slot) {
+        const meal = this.currentMenu.meals[slot.id];
+
         if (!meal) {
             return `
-                <div class="meal-empty">
-                    <p>Нет подходящих блюд для этой категории</p>
-                </div>
+                <li class="meal-card meal-card-empty">
+                    <p class="meal-slot-name">${slot.name}</p>
+                    <p class="meal-empty">Нет подходящих блюд</p>
+                </li>
             `;
         }
-        
-        return `
-            <div class="meal-grid">
-                ${this.renderMealCard(meal, category)}
-            </div>
-        `;
-    }
-    
-    renderMealCard(meal, category) {
+
         const multiplier = meal.multiplier || 1;
-        const isModified = multiplier !== 1;
-        const note = meal.note;
-        
+        const portion = multiplier !== 1 ? `, порция ${Math.round(multiplier * 100)} %` : '';
+        const ingredients = (meal.ingredients || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+
         return `
-            <div class="meal-card" data-meal-id="${meal.id}" data-category="${category}">
-                ${this.renderMealImage(meal, 'meal-card-image')}
-                <div class="meal-card-content">
-                    <h4>${meal.name}</h4>
-                    
-                    ${isModified ? `
-                        <div class="meal-modified-badge">
-                            Порция скорректирована (${Math.round(multiplier * 100)}%)
-                        </div>
-                    ` : ''}
-                    
-                    <div class="meal-stats">
-                        <div class="meal-stat">
-                            <strong>${meal.adjustedCalories}</strong> ккал
-                            ${isModified ? `<span class="meal-original">(${meal.originalCalories})</span>` : ''}
-                        </div>
-                        <div class="meal-stat">
-                            <strong>${Math.round(meal.protein * multiplier)}</strong> г
-                        </div>
-                        <div class="meal-stat">
-                            <strong>${Math.round(meal.fat * multiplier)}</strong> г
-                        </div>
-                        <div class="meal-stat">
-                            <strong>${Math.round(meal.carbs * multiplier)}</strong> г
-                        </div>
-                    </div>
-                    
-                    ${note ? `
-                        <div class="meal-note">
-                            ${note}
-                        </div>
-                    ` : ''}
-                    
-                    <div class="meal-info">
-                        <span class="meal-time">${meal.preparationTime || 15} мин</span>
-                        <span class="meal-difficulty">${meal.difficulty || 'Легко'}</span>
-                        <button class="meal-details-btn" data-meal-id="${meal.id}">
-                            Подробнее
-                        </button>
+            <li class="meal-card">
+                ${this.renderMealImage(meal)}
+                <div class="meal-card-body">
+                    <p class="meal-slot-name">${slot.name}</p>
+                    <h3>${escapeHtml(meal.name)}</h3>
+                    <p class="meal-kcal"><strong>${formatNumber(meal.adjustedCalories)} ккал</strong>${portion}</p>
+                    ${renderMacroPills({
+                        protein: Math.round(meal.protein * multiplier),
+                        fat: Math.round(meal.fat * multiplier),
+                        carbs: Math.round(meal.carbs * multiplier)
+                    }, 'macro-pills-small')}
+                    <div class="meal-buttons">
+                        <details class="meal-recipe">
+                            <summary>Рецепт</summary>
+                            <ul>${ingredients}</ul>
+                            ${multiplier !== 1 ? `<p>Граммы указаны для обычной порции, ваша — ${Math.round(multiplier * 100)} % от неё.</p>` : ''}
+                            ${meal.note ? `<p>${escapeHtml(meal.note)}</p>` : ''}
+                            <p>${meal.preparationTime || 15} минут, ${(meal.difficulty || 'легко').toLowerCase()}</p>
+                        </details>
+                        <button class="meal-replace" type="button" data-category="${slot.id}">Заменить</button>
                     </div>
                 </div>
-            </div>
+            </li>
         `;
     }
-    
-    renderMealImage(meal, className) {
+
+    renderMealImage(meal) {
         if (meal.image) {
-            return `<img src="${meal.image}" alt="${meal.name}" class="${className}" onerror="this.classList.add('meal-image-broken')">`;
+            return `<img src="${escapeHtml(meal.image)}" alt="" class="meal-image" loading="lazy">`;
         }
-        return `<div class="${className} meal-image-placeholder"></div>`;
+        return '<div class="meal-image meal-image-placeholder" aria-hidden="true"></div>';
     }
 
-    setupTabListeners() {
-        const tabs = document.querySelectorAll('.tab-btn');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const category = tab.dataset.category;
-                if (category && category !== this.currentCategory) {
-                    this.currentCategory = category;
-                    this.renderMenu(this.currentMenu, this.currentHealthProfile);
-                }
+    setupListeners(container) {
+        container.querySelectorAll('img.meal-image').forEach((image) => {
+            image.addEventListener('error', () => {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'meal-image meal-image-placeholder';
+                image.replaceWith(placeholder);
             });
         });
-    }
-    
-    setupActionListeners() {
-        const detailBtns = document.querySelectorAll('.meal-details-btn');
-        detailBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const mealId = btn.dataset.mealId;
-                const meal = this.findMealById(mealId);
-                if (meal) {
-                    this.showMealDetails(meal);
-                }
+
+        container.querySelectorAll('.meal-replace').forEach((button) => {
+            button.addEventListener('click', () => {
+                const category = button.dataset.category;
+                document.dispatchEvent(new CustomEvent('requestMealRefresh', {
+                    detail: { category, currentMealId: this.currentMenu.meals[category]?.id }
+                }));
             });
         });
-        
-        const refreshBtn = document.getElementById('refresh-meal');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', () => {
-                this.handleRefreshMeal();
-            });
-        }
-        
-        const saveBtn = document.getElementById('save-menu');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => {
-                this.handleSaveMenu();
-            });
-        }
-    }
-    
-    findMealById(mealId) {
-        for (const category of Object.keys(this.currentMenu?.meals || {})) {
-            const meal = this.currentMenu.meals[category];
-            if (meal && meal.id === mealId) {
-                return { ...meal, category };
-            }
-        }
-        return null;
-    }
-    
-    showMealDetails(meal) {
-        const multiplier = meal.multiplier || 1;
-        
-        const modalHtml = `
-            <div class="meal-detail-modal" id="meal-detail-modal">
-                <div class="meal-detail-content">
-                    <button class="close-detail" id="close-detail">×</button>
-                    ${this.renderMealImage(meal, 'meal-detail-image')}
-                    
-                    <h2>${meal.name}</h2>
-                    
-                    <div class="meal-stats">
-                        <div class="meal-stat">${meal.adjustedCalories} ккал</div>
-                        <div class="meal-stat">${Math.round(meal.protein * multiplier)} г</div>
-                        <div class="meal-stat">${Math.round(meal.fat * multiplier)} г</div>
-                        <div class="meal-stat">${Math.round(meal.carbs * multiplier)} г</div>
-                    </div>
-                    
-                    <div class="meal-detail-ingredients">
-                        <strong>Ингредиенты:</strong>
-                        <ul>
-                            ${(meal.ingredients || []).map(ing => `<li>${ing}</li>`).join('')}
-                        </ul>
-                    </div>
-                    
-                    ${meal.note ? `
-                        <div class="meal-note">
-                            <strong>Рекомендация:</strong> ${meal.note}
-                        </div>
-                    ` : ''}
-                    
-                    <div class="meal-detail-info">
-                        <p>Время приготовления: ${meal.preparationTime || 15} минут</p>
-                        <p>Сложность: ${meal.difficulty || 'Легко'}</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        const oldModal = document.getElementById('meal-detail-modal');
-        if (oldModal) oldModal.remove();
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
-        const modal = document.getElementById('meal-detail-modal');
-        const closeBtn = document.getElementById('close-detail');
-        
-        // Просто показываем модальное окно
-        modal.classList.add('active');
-        
-        const closeModal = () => {
-            modal.classList.remove('active');
-            setTimeout(() => modal.remove(), 200);
-        };
-        
-        closeBtn.addEventListener('click', closeModal);
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeModal();
+
+        container.querySelector('#save-menu').addEventListener('click', () => {
+            document.dispatchEvent(new CustomEvent('saveMenu', { detail: { menu: this.currentMenu } }));
         });
     }
-    
-    handleRefreshMeal() {
-        const event = new CustomEvent('requestMealRefresh', {
-            detail: {
-                category: this.currentCategory,
-                currentMealId: this.currentMenu?.meals[this.currentCategory]?.id,
-                menuData: this.currentMenu
-            }
-        });
-        document.dispatchEvent(event);
-    }
-    
-    handleSaveMenu() {
-        const event = new CustomEvent('saveMenu', {
-            detail: {
-                menu: this.currentMenu
-            }
-        });
-        document.dispatchEvent(event);
-    }
-    
+
     updateCategory(category, newMeal) {
-        if (this.currentMenu && this.currentMenu.meals) {
-            this.currentMenu.meals[category] = newMeal;
-            if (this.currentCategory === category) {
-                this.renderMenu(this.currentMenu, this.currentHealthProfile);
-            }
-        }
-    }
-}
+        if (!this.currentMenu?.meals) return;
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = MealRenderer;
+        this.currentMenu.meals[category] = newMeal;
+        this.renderMenu(this.currentMenu);
+        document.querySelector(`.meal-replace[data-category="${category}"]`)?.focus();
+    }
 }

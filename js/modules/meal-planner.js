@@ -1,4 +1,6 @@
-// js/modules/meal-planner.js - ИСПРАВЛЕННАЯ ВЕРСИЯ (правильный подбор)
+const MIN_PORTION = 0.7;
+const MAX_PORTION = 1.5;
+const PORTION_NOTE_PATTERN = /^(Уменьшить|Увеличить|Добавить|Ограничить|Использовать|Творог|Мед|На воде)/;
 
 class MealPlanner {
     constructor(database) {
@@ -12,32 +14,25 @@ class MealPlanner {
         return 'underweight';
     }
 
-    getMealMultiplier(meal, healthProfile, goal) {
-        const profile = meal.healthProfiles?.[healthProfile];
-        
-        if (goal === 'gain') {
-            // Для высококалорийных блюд - множитель 1.0
-            if (meal.calories >= 700) return 1.0;
-            return profile?.portionMultiplier || 1.2;
-        }
-        
-        if (goal === 'lose') {
-            return profile?.portionMultiplier || 0.8;
-        }
-        
-        return profile?.portionMultiplier || 1.0;
+    getMealMultiplier(meal, targetCalories) {
+        const exact = targetCalories / meal.calories;
+        const clamped = Math.min(Math.max(exact, MIN_PORTION), MAX_PORTION);
+        return Math.round(clamped * 20) / 20;
+    }
+
+    getProfileNote(meal, healthProfile) {
+        const note = meal.healthProfiles?.[healthProfile]?.note;
+        if (!note || PORTION_NOTE_PATTERN.test(note)) return null;
+        return note;
     }
 
     selectBestMeal(meals, targetCalories, goal = 'maintain') {
         if (!meals || meals.length === 0) return null;
         
-        // Для набора массы - ищем блюдо, максимально близкое к цели, но не сильно превышающее
         if (goal === 'gain') {
-            // Сначала ищем блюда, которые не превышают цель более чем на 30%
             const reasonable = meals.filter(meal => meal.calories <= targetCalories * 1.3);
             
             if (reasonable.length > 0) {
-                // Из разумных выбираем ближайшее к цели
                 return reasonable.reduce((best, current) => {
                     const currentDiff = Math.abs(current.calories - targetCalories);
                     const bestDiff = Math.abs(best.calories - targetCalories);
@@ -45,7 +40,6 @@ class MealPlanner {
                 });
             }
             
-            // Если нет разумных, берем ближайшее вообще
             return meals.reduce((best, current) => {
                 const currentDiff = Math.abs(current.calories - targetCalories);
                 const bestDiff = Math.abs(best.calories - targetCalories);
@@ -53,7 +47,6 @@ class MealPlanner {
             });
         }
         
-        // Для похудения и поддержания - стандартный подбор
         return meals.reduce((best, current) => {
             const currentDiff = Math.abs(current.calories - targetCalories);
             const bestDiff = Math.abs(best.calories - targetCalories);
@@ -62,11 +55,6 @@ class MealPlanner {
     }
 
     generateDailyMenu(calories, bmi, goal) {
-        if (!this.database.isReady()) {
-            console.error('База данных не готова');
-            return null;
-        }
-        
         const healthProfile = this.getHealthProfile(bmi);
         const categories = this.database.getAllCategories();
         const menu = {
@@ -75,6 +63,7 @@ class MealPlanner {
             goal,
             totalCalories: calories,
             generatedAt: new Date().toISOString(),
+            advice: this.getNutritionAdvice(bmi, goal),
             meals: {}
         };
         
@@ -84,15 +73,13 @@ class MealPlanner {
             const categoryInfo = this.database.getCategoryInfo(category);
             const targetCategoryCalories = calories * (categoryInfo.caloriePercent / 100);
             
-            // Получаем блюда с учетом цели
             const meals = this.database.getMealsByCategoryWithGoal(category, healthProfile, goal);
             
             if (meals && meals.length > 0) {
-                // Используем улучшенный подбор с учетом цели
                 const selectedMeal = this.selectBestMeal(meals, targetCategoryCalories, goal);
                 
                 if (selectedMeal) {
-                    const multiplier = this.getMealMultiplier(selectedMeal, healthProfile, goal);
+                    const multiplier = this.getMealMultiplier(selectedMeal, targetCategoryCalories);
                     const adjustedCalories = Math.round(selectedMeal.calories * multiplier);
                     
                     menu.meals[category] = {
@@ -100,7 +87,7 @@ class MealPlanner {
                         originalCalories: selectedMeal.calories,
                         adjustedCalories,
                         multiplier,
-                        note: selectedMeal.healthProfiles?.[healthProfile]?.note || null
+                        note: this.getProfileNote(selectedMeal, healthProfile)
                     };
                     
                     totalGeneratedCalories += adjustedCalories;
@@ -108,7 +95,6 @@ class MealPlanner {
                     menu.meals[category] = null;
                 }
             } else {
-                console.warn(`Нет блюд для категории ${category}`);
                 menu.meals[category] = null;
             }
         }
@@ -128,17 +114,19 @@ class MealPlanner {
         const alternativeMeals = meals.filter(meal => meal.id !== currentMealId);
         if (alternativeMeals.length === 0) return null;
         
-        const selectedMeal = this.selectBestMeal(alternativeMeals, targetCalories, goal);
-        if (!selectedMeal) return null;
+        const closestMeals = [...alternativeMeals]
+            .sort((a, b) => Math.abs(a.calories - targetCalories) - Math.abs(b.calories - targetCalories))
+            .slice(0, 3);
+        const selectedMeal = closestMeals[Math.floor(Math.random() * closestMeals.length)];
         
-        const multiplier = this.getMealMultiplier(selectedMeal, healthProfile, goal);
+        const multiplier = this.getMealMultiplier(selectedMeal, targetCalories);
         
         return {
             ...selectedMeal,
             originalCalories: selectedMeal.calories,
             adjustedCalories: Math.round(selectedMeal.calories * multiplier),
             multiplier,
-            note: selectedMeal.healthProfiles?.[healthProfile]?.note || null
+            note: this.getProfileNote(selectedMeal, healthProfile)
         };
     }
 
@@ -201,5 +189,3 @@ class MealPlanner {
         return advice[healthProfile]?.[goal] || ['Следуйте сбалансированному питанию'];
     }
 }
-
-window.MealPlanner = MealPlanner;

@@ -2,328 +2,48 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="История расчетов калорий">
-  <meta name="theme-color" content="#fc5000">
-  <title>История | CaloTrack</title>
-  <link rel="stylesheet" href="css/tokens.css" />
-  <link rel="stylesheet" href="css/style.css" />
-  <link rel="stylesheet" href="css/modal.css" />
-  <link rel="stylesheet" href="css/meal-planner.css" />
-  <link rel="icon" type="image/png" href="/favicon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="История расчётов нормы калорий и сохранённые меню.">
+  <meta name="theme-color" content="#f1ebe2">
+  <title>История расчётов — CaloTrack</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preload" href="fonts/onest-variable.woff" as="font" type="font/woff" crossorigin>
+  <link rel="preload" href="fonts/nunito-black.woff" as="font" type="font/woff" crossorigin>
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/theme-manager.js"></script>
 </head>
 <body>
-  <header class="site-header">
-    <div class="site-header-inner">
-      <a href="index.html" class="brand">CaloTrack</a>
-      <nav class="sidebar">
-        <ul>
-        <li><a href="index.html">Главная</a></li>
-        <li><a href="calculator.html">Калькулятор</a></li>
-        <li><a href="proteins.html">Белки</a></li>
-        <li><a href="fats.html">Жиры</a></li>
-        <li><a href="carbs.html">Углеводы</a></li>
-        <li><a href="history.html" class="active">История</a></li>
-      </ul>
-      </nav>
-    </div>
-  </header>
+  <main class="page" id="main">
+    <h1 class="display page-title">История</h1>
 
-  <main class="page">
-      <div class="quick-actions"></div>
-      
-      <h1>История расчётов</h1>
-      <p>Здесь хранятся ваши последние расчеты калорий и БЖУ.</p>
+    <div class="mascot" id="history-mascot" hidden></div>
 
-      <div class="feature-card purple" style="margin-bottom: 25px;">
-        <h3 style="margin-top: 0;">Анализ прогресса</h3>
-        <p>Сравнивайте предыдущие расчеты, чтобы увидеть динамику изменений.</p>
+    <section class="section" id="history-section">
+      <div class="section-head">
+        <h2>Расчёты</h2>
+        <button type="button" class="button button-soft" id="clear-history" hidden>Очистить историю</button>
       </div>
+      <p class="section-note" id="history-summary"></p>
+      <ol class="history-list" id="history-list"></ol>
+    </section>
 
-      <button id="clear-history" class="clear-btn">Очистить историю</button>
-       
-      <div id="history-list" class="history-list">
-        <div style="text-align: center; padding: 40px 20px; opacity: 0.7;">
-          <div class="skeleton skeleton-text" style="width: 60%; margin: 10px auto;"></div>
-          <div class="skeleton skeleton-text" style="width: 40%; margin: 10px auto;"></div>
-          <p>Загрузка истории...</p>
-        </div>
-      </div>
+    <section class="section" id="saved-section">
+      <h2>Сохранённые меню</h2>
+      <ul class="saved-list" id="saved-menus"></ul>
+    </section>
 
-      <div class="info-box" style="margin-top: 30px;">
-        <h3 style="margin-top: 0;">Советы</h3>
-        <ul>
-          <li>Сравнивайте изменения в калораже при смене целей</li>
-          <li>Отслеживайте динамику соотношения БЖУ</li>
-          <li>Используйте историю для корректировки плана питания</li>
-        </ul>
-      </div>
-    </main>
+    <p class="section-note storage-note">Расчёты и меню хранятся только в этом браузере: последние 20 расчётов и 10 меню.</p>
+  </main>
 
   <footer class="site-footer">
-    <div class="footer-content">
-      <div class="footer-main">
-        <div class="footer-brand">
-          <h3>CaloTrack</h3>
-          <p>Интеллектуальный помощник для расчета калорий и планирования питания</p>
-        </div>
-        
-        <div class="footer-links">
-          <div class="footer-section">
-            <h4>Информация</h4>
-            <ul>
-              <li><a href="#" id="about-link">О проекте</a></li>
-              <li><a href="#" id="privacy-link">Политика конфиденциальности</a></li>
-              <li><a href="#" id="terms-link">Условия использования</a></li>
-            </ul>
-          </div>
-          
-          <div class="footer-section">
-            <h4>Разделы</h4>
-            <ul>
-              <li><a href="calculator.html">Калькулятор</a></li>
-              <li><a href="proteins.html">Белки</a></li>
-              <li><a href="fats.html">Жиры</a></li>
-              <li><a href="carbs.html">Углеводы</a></li>
-              <li><a href="history.html">История</a></li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      
-      <div class="footer-divider"></div>
-      
-      <div class="footer-bottom">
-        <p class="copyright">© 2026 CaloTrack. Все права защищены.</p>
-        <p class="disclaimer">Сервис носит информационный характер. Результаты расчетов приблизительны.</p>
-      </div>
-    </div>
+    <p>Ещё на сайте: <a href="index.html">главная</a>, <a href="calculator.html">расчёт нормы</a>, <a href="proteins.html">белки</a>, <a href="fats.html">жиры</a> и <a href="carbs.html">углеводы</a>.</p>
+    <p>Считаем приблизительно — это не замена врачу. Подробнее: <a href="about.html">о проекте</a>, <a href="privacy.html">конфиденциальность</a> и <a href="terms.html">условия использования</a>. <button class="theme-toggle" type="button" hidden></button></p>
   </footer>
 
-  <div id="privacy-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-container" style="max-width: 700px;">
-      <div class="modal-header">
-        <h2>Политика конфиденциальности</h2>
-        <button class="close-modal-btn close-privacy">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="legal-date">Дата последнего обновления: 23 марта 2026 г.</p>
-        
-        <h3>1. Общие положения</h3>
-        <p>Настоящая Политика конфиденциальности (далее — Политика) определяет порядок обработки и защиты информации о физических лицах, пользующихся сервисом CaloTrack (далее — Сервис).</p>
-        <p>Используя Сервис, пользователь выражает свое согласие с условиями настоящей Политики. В случае несогласия с условиями Политики пользователь обязан прекратить использование Сервиса.</p>
-        
-        <h3>2. Собираемая информация</h3>
-        <p><strong>2.1. Информация, предоставляемая пользователем:</strong></p>
-        <ul>
-          <li>антропометрические данные (рост, вес, возраст, пол);</li>
-          <li>цели использования Сервиса (поддержание веса, похудение, набор массы);</li>
-          <li>уровень физической активности;</li>
-          <li>история расчетов и сохраненные меню.</li>
-        </ul>
-        <p><strong>2.2. Техническая информация:</strong></p>
-        <ul>
-          <li>тип устройства и операционная система;</li>
-          <li>настройки языка и часового пояса;</li>
-          <li>предпочтения по оформлению (тема).</li>
-        </ul>
-        
-        <h3>3. Хранение и обработка данных</h3>
-        <p><strong>3.1. Локальное хранение:</strong> Все данные, вводимые пользователем, хранятся исключительно в локальном хранилище браузера (localStorage) на устройстве пользователя. Сервис не передает данные на внешние серверы.</p>
-        <p><strong>3.2. Файлы cookie:</strong> Сервис использует только технически необходимые cookie для сохранения настроек темы оформления. Cookie не используются для отслеживания или сбора персональной информации.</p>
-        <p><strong>3.3. Срок хранения:</strong> Данные хранятся на устройстве пользователя до момента их ручной очистки пользователем или до очистки данных браузера.</p>
-        
-        <h3>4. Передача данных третьим лицам</h3>
-        <p>Сервис НЕ передает, не продает и не раскрывает персональные данные пользователей третьим лицам. Вся информация остается на устройстве пользователя.</p>
-        
-        <h3>5. Безопасность</h3>
-        <p>Администрация Сервиса принимает разумные меры для защиты данных пользователей, включая использование современных протоколов безопасности. Однако пользователь должен понимать, что ни один метод передачи данных через интернет не является абсолютно безопасным.</p>
-        
-        <h3>6. Права пользователя</h3>
-        <p>Пользователь имеет право:</p>
-        <ul>
-          <li>получить доступ к своим данным;</li>
-          <li>удалить все данные через интерфейс Сервиса;</li>
-          <li>отказаться от использования Сервиса в любое время.</li>
-        </ul>
-        
-        <h3>7. Изменения Политики конфиденциальности</h3>
-        <p>Администрация Сервиса оставляет за собой право вносить изменения в настоящую Политику. Актуальная версия всегда доступна по данной ссылке. Продолжение использования Сервиса после внесения изменений означает согласие с обновленной Политикой.</p>
-        
-        <h3>8. Контактная информация</h3>
-        <p>По всем вопросам, связанным с настоящей Политикой, вы можете обратиться через форму обратной связи, доступную в интерфейсе Сервиса.</p>
-        
-        <p class="legal-footer">© 2026 CaloTrack. Все права защищены.</p>
-      </div>
-    </div>
-  </div>
-
-  <div id="terms-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-container" style="max-width: 700px;">
-      <div class="modal-header">
-        <h2>Условия использования</h2>
-        <button class="close-modal-btn close-terms">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="legal-date">Дата последнего обновления: 23 марта 2026 г.</p>
-        
-        <h3>1. Общие положения</h3>
-        <p>Настоящие Условия использования (далее — Условия) регулируют отношения между администрацией сервиса CaloTrack (далее — Администрация) и пользователем сервиса (далее — Пользователь).</p>
-        <p>Используя Сервис, Пользователь подтверждает, что ознакомлен с настоящими Условиями и принимает их в полном объеме.</p>
-        
-        <h3>2. Предоставляемые услуги</h3>
-        <p>Сервис CaloTrack предоставляет Пользователю следующие возможности:</p>
-        <ul>
-          <li>расчет суточной нормы калорий и соотношения БЖУ;</li>
-          <li>генерация персонального меню на основе рассчитанных параметров;</li>
-          <li>сохранение истории расчетов;</li>
-          <li>информационные материалы о нутриентах и здоровом питании.</li>
-        </ul>
-        
-        <h3>3. Информационный характер</h3>
-        <p><strong>3.1. Не является медицинской консультацией:</strong> Все материалы, расчеты и рекомендации, предоставляемые Сервисом, носят исключительно информационный характер. Сервис не заменяет профессиональную медицинскую консультацию, диагностику или лечение.</p>
-        <p><strong>3.2. Рекомендация врача:</strong> Перед началом любой диеты или изменением режима питания рекомендуется проконсультироваться с квалифицированным специалистом в области диетологии или медицины.</p>
-        <p><strong>3.3. Индивидуальные особенности:</strong> Результаты расчетов являются приблизительными и могут не учитывать индивидуальные особенности организма.</p>
-        
-        <h3>4. Ответственность</h3>
-        <p><strong>4.1. Ограничение ответственности:</strong> Администрация не несет ответственности за любые последствия, возникшие в результате использования Пользователем информации, полученной через Сервис.</p>
-        <p><strong>4.2. Ответственность пользователя:</strong> Пользователь самостоятельно несет ответственность за принятие решений, основанных на информации, полученной через Сервис.</p>
-        <p><strong>4.3. Технические неполадки:</strong> Администрация не гарантирует бесперебойную работу Сервиса и не несет ответственности за временные технические сбои.</p>
-        
-        <h3>5. Интеллектуальная собственность</h3>
-        <p>Все материалы, размещенные в Сервисе, включая текст, графику, логотипы, являются объектами интеллектуальной собственности. Копирование, распространение или использование материалов без письменного согласия Администрации запрещено.</p>
-        
-        <h3>6. Изменение условий</h3>
-        <p>Администрация оставляет за собой право в любое время изменять настоящие Условия без предварительного уведомления. Продолжение использования Сервиса после внесения изменений означает согласие с новой редакцией.</p>
-        
-        <h3>7. Прекращение использования</h3>
-        <p>Пользователь может прекратить использование Сервиса в любое время. Администрация оставляет за собой право прекратить доступ к Сервису или его отдельным функциям без предварительного уведомления.</p>
-        
-        <h3>8. Контактная информация</h3>
-        <p>По вопросам, связанным с настоящими Условиями, обращайтесь через форму обратной связи, доступную в интерфейсе Сервиса.</p>
-        
-        <p class="legal-footer">© 2026 CaloTrack. Все права защищены.</p>
-      </div>
-    </div>
-  </div>
-  
-  <div id="about-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-container" style="max-width: 600px;">
-      <div class="modal-header">
-        <h2>О проекте CaloTrack</h2>
-        <button class="close-modal-btn close-about">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="about-logo">
-          <h3 style="margin: 10px 0 5px;">CaloTrack</h3>
-          <p style="color: var(--primary-color); font-weight: 600;">Версия 2.0.0</p>
-        </div>
-        
-        <h3>О проекте</h3>
-        <p><strong>CaloTrack</strong> — это интеллектуальный помощник для расчета калорий и планирования питания. Проект создан для людей, которые следят за своим здоровьем и хотят достичь поставленных целей в питании.</p>
-        
-        <h3>Основные функции</h3>
-        <ul>
-          <li>Расчет суточной нормы калорий по формуле Миффлина-Сан-Жеора</li>
-          <li>Определение оптимального соотношения белков, жиров и углеводов</li>
-          <li>Генерация персонального меню на основе ИМТ и целей</li>
-          <li>Прогноз изменения веса на 12 месяцев</li>
-          <li>Сохранение истории расчетов и избранных меню</li>
-          <li>Поддержка светлой и темной темы оформления</li>
-        </ul>
-        
-        <h3>Технологии</h3>
-        <p>Проект разработан с использованием современных веб-технологий:</p>
-        <ul>
-          <li>HTML5, CSS3, JavaScript (ES6+)</li>
-          <li>Chart.js — для визуализации данных</li>
-          <li>Адаптивная верстка — для корректного отображения на всех устройствах</li>
-          <li>LocalStorage — для хранения данных пользователя</li>
-        </ul>
-        
-        <h3>Разработчик</h3>
-        <p>Проект создан с для всех, кто заботится о своем здоровье. Если у вас есть вопросы, предложения или вы нашли ошибку — свяжитесь с нами через форму обратной связи, доступную в интерфейсе.</p>
-        
-        <h3>Лицензия</h3>
-        <p>Все права защищены. Копирование материалов без указания источника запрещено.</p>
-        
-        <p class="legal-footer" style="margin-top: 20px;">© 2026 CaloTrack. Все права защищены.</p>
-      </div>
-    </div>
-  </div>
-
-  <script src="js/theme-manager.js"></script>
-  <script src="js/navigation.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/nutrition.js"></script>
+  <script src="js/mascot.js"></script>
   <script src="js/history.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      var privacyLink = document.getElementById('privacy-link');
-      var termsLink = document.getElementById('terms-link');
-      var aboutLink = document.getElementById('about-link');
-      
-      var privacyModal = document.getElementById('privacy-modal');
-      var termsModal = document.getElementById('terms-modal');
-      var aboutModal = document.getElementById('about-modal');
-      
-      function openModal(modal) {
-        modal.style.display = 'flex';
-        setTimeout(function() { modal.classList.add('active'); }, 10);
-        document.body.style.overflow = 'hidden';
-      }
-      
-      function closeModal(modal) {
-        modal.classList.remove('active');
-        setTimeout(function() { 
-          modal.style.display = 'none';
-          document.body.style.overflow = '';
-        }, 300);
-      }
-      
-      if (privacyLink) {
-        privacyLink.onclick = function(e) {
-          e.preventDefault();
-          openModal(privacyModal);
-        };
-      }
-      
-      if (termsLink) {
-        termsLink.onclick = function(e) {
-          e.preventDefault();
-          openModal(termsModal);
-        };
-      }
-      
-      if (aboutLink) {
-        aboutLink.onclick = function(e) {
-          e.preventDefault();
-          openModal(aboutModal);
-        };
-      }
-      
-      var closePrivacy = document.querySelector('.close-privacy');
-      var closeTerms = document.querySelector('.close-terms');
-      var closeAbout = document.querySelector('.close-about');
-      
-      if (closePrivacy) closePrivacy.onclick = function() { closeModal(privacyModal); };
-      if (closeTerms) closeTerms.onclick = function() { closeModal(termsModal); };
-      if (closeAbout) closeAbout.onclick = function() { closeModal(aboutModal); };
-      
-      [privacyModal, termsModal, aboutModal].forEach(function(modal) {
-        if (modal) {
-          modal.onclick = function(e) {
-            if (e.target === modal) closeModal(modal);
-          };
-        }
-      });
-      
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-          if (privacyModal && privacyModal.classList.contains('active')) closeModal(privacyModal);
-          if (termsModal && termsModal.classList.contains('active')) closeModal(termsModal);
-          if (aboutModal && aboutModal.classList.contains('active')) closeModal(aboutModal);
-        }
-      });
-    });
-  </script>
 </body>
 </html>

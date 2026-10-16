@@ -1,139 +1,114 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const historyList = document.getElementById('history-list');
-  const clearBtn = document.getElementById('clear-history');
-  
-  loadHistory();
-  updateStats();
+    const historyList = document.getElementById('history-list');
+    const historySummary = document.getElementById('history-summary');
+    const clearBtn = document.getElementById('clear-history');
+    const savedList = document.getElementById('saved-menus');
+    const mascotElement = document.getElementById('history-mascot');
+    const mascot = new Mascot(mascotElement);
 
-  function loadHistory() {
-    const history = JSON.parse(localStorage.getItem('caloHistory')) || [];
+    renderHistory();
+    renderSavedMenus();
 
-    historyList.innerHTML = '';
+    function renderHistory() {
+        const history = readStorage(STORAGE_KEYS.history, []);
+        clearBtn.hidden = history.length === 0;
 
-    if (history.length === 0) {
-      historyList.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px; color: var(--text-color); opacity: 0.7;">
-          <p>История расчётов пуста.</p>
-          <p>Перейдите в <a href="calculator.html" style="color: var(--primary-color);">калькулятор</a>, чтобы сделать первый расчет!</p>
-        </div>
-      `;
-    } else {
-      history.forEach((entry, index) => {
-        const div = document.createElement('div');
-        div.className = 'history-entry';
-        
-        let goalIcon = '';
-        let goalText = 'Поддержание';
-        if (entry.calories < 1800) {
-          goalIcon = '↓';
-          goalText = 'Похудение';
-        } else if (entry.calories > 2500) {
-          goalIcon = '↑';
-          goalText = 'Набор массы';
+        mascotElement.hidden = history.length > 0;
+        if (history.length === 0) {
+            historySummary.textContent = '';
+            historyList.innerHTML = '';
+            mascot.say('Тут пока пусто. Посчитайте норму в калькуляторе — я запишу её сюда, и можно будет следить, как она меняется.', 'think');
+            return;
         }
-        
-        div.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
-            <div>
-              <strong>${goalIcon} ${entry.date}</strong>
-              <div style="font-size: 12px; color: var(--text-color); opacity: 0.7; margin-top: 2px;">${goalText}</div>
-            </div>
-            <span style="background: var(--primary-color); color: var(--primary-color-text); padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: 600;">
-              ${entry.calories} ккал
-            </span>
-          </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 15px;">
-            <div style="text-align: center; padding: 10px; background: rgba(252, 80, 0, 0.12); border-radius: 8px;">
-              <div style="color: var(--primary-color); font-weight: 700; font-size: 18px;">${entry.proteinGrams}г</div>
-              <div style="font-size: 12px; color: var(--text-color);">Белки</div>
-            </div>
-            <div style="text-align: center; padding: 10px; background: rgba(255, 152, 0, 0.1); border-radius: 8px;">
-              <div style="color: #ff9800; font-weight: 700; font-size: 18px;">${entry.fatGrams}г</div>
-              <div style="font-size: 12px; color: var(--text-color);">Жиры</div>
-            </div>
-            <div style="text-align: center; padding: 10px; background: rgba(33, 150, 243, 0.1); border-radius: 8px;">
-              <div style="color: #2196f3; font-weight: 700; font-size: 18px;">${entry.carbGrams}г</div>
-              <div style="font-size: 12px; color: var(--text-color);">Углеводы</div>
-            </div>
-          </div>
+
+        historySummary.textContent = buildSummary(history);
+        historyList.innerHTML = history.map(renderEntry).join('');
+    }
+
+    function buildSummary(history) {
+        const latest = history[0];
+        const oldest = history[history.length - 1];
+        const count = countWithWord(history.length, ['расчёт', 'расчёта', 'расчётов']);
+
+        if (history.length < 2 || latest.calories === oldest.calories) {
+            return `${count}. Последняя норма — ${formatNumber(latest.calories)} ккал.`;
+        }
+
+        const difference = latest.calories - oldest.calories;
+        const direction = difference > 0 ? 'выросла' : 'снизилась';
+        return `${count}. С первого расчёта норма ${direction} на ${formatNumber(Math.abs(difference))} ккал — до ${formatNumber(latest.calories)} ккал.`;
+    }
+
+    function renderEntry(entry) {
+        const goal = GOAL_NAMES[entry.goal];
+        const details = [goal, entry.weight ? `${formatNumber(entry.weight, 1)} кг` : null].filter(Boolean).join(', ');
+
+        return `
+            <li class="history-entry">
+                <p class="history-date">
+                    ${formatDateTime(parseStoredDate(entry.date))}
+                    ${details ? `<small>${details}</small>` : ''}
+                </p>
+                <p class="history-kcal">${formatNumber(entry.calories)} <small>ккал</small></p>
+                <div class="history-macros">
+                    ${renderMacroPills({ protein: entry.proteinGrams, fat: entry.fatGrams, carbs: entry.carbGrams }, 'macro-pills-small')}
+                </div>
+            </li>
         `;
-        historyList.appendChild(div);
-      });
     }
-  }
 
-  function updateStats() {
-    const history = JSON.parse(localStorage.getItem('caloHistory')) || [];
-    const thisMonth = history.filter(entry => {
-      const entryDate = new Date(entry.date);
-      const now = new Date();
-      return entryDate.getMonth() === now.getMonth() && entryDate.getFullYear() === now.getFullYear();
+    function renderSavedMenus() {
+        const savedMenus = readStorage(STORAGE_KEYS.savedMenus, []);
+
+        if (savedMenus.length === 0) {
+            savedList.innerHTML = `
+                <li class="empty-state">
+                    Сохранённых меню нет. Составьте меню в <a href="calculator.html">калькуляторе</a> и нажмите «Сохранить меню».
+                </li>
+            `;
+            return;
+        }
+
+        const mealNames = (menu) => Object.values(menu.meals || {})
+            .filter(Boolean)
+            .map((meal) => `<li>${escapeHtml(meal.name)}</li>`)
+            .join('');
+
+        savedList.innerHTML = savedMenus.map((item) => `
+            <li class="saved-menu">
+                <div class="saved-menu-head">
+                    <p class="saved-menu-kcal">${formatNumber(item.menu.generatedCalories || item.menu.totalCalories)} ккал</p>
+                    <p class="saved-menu-date">${formatDateTime(parseStoredDate(item.date))}</p>
+                </div>
+                <ul class="saved-menu-meals">${mealNames(item.menu)}</ul>
+                <div class="saved-menu-actions">
+                    <a class="button button-dark" href="calculator.html?menu=${encodeURIComponent(item.id)}">Открыть</a>
+                    <button class="button button-soft" type="button" data-delete="${escapeHtml(item.id)}">Удалить</button>
+                </div>
+            </li>
+        `).join('');
+    }
+
+    savedList.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-delete]');
+        if (!button) return;
+
+        const savedMenus = readStorage(STORAGE_KEYS.savedMenus, []);
+        writeStorage(STORAGE_KEYS.savedMenus, savedMenus.filter((item) => String(item.id) !== button.dataset.delete));
+        renderSavedMenus();
+        showToast('Меню удалено');
     });
-    
-    const monthCount = thisMonth.length;
-    const maxExpected = 10;
-    const percent = Math.min(Math.round((monthCount / maxExpected) * 100), 100);
-    
-    const statsCount = document.getElementById('stats-count');
-    const statsFill = document.getElementById('stats-fill');
-    if (statsCount) statsCount.textContent = `${percent}%`;
-    if (statsFill) statsFill.style.width = `${percent}%`;
-    
-    const goalAchieved = history.filter(entry => {
-      const calories = entry.calories;
-      return (calories >= 1800 && calories <= 2500);
-    }).length;
-    
-    const goalPercent = history.length > 0 ? Math.min(Math.round((goalAchieved / history.length) * 100), 100) : 0;
-    const statsGoal = document.getElementById('stats-goal');
-    const statsGoalFill = document.getElementById('stats-goal-fill');
-    if (statsGoal) statsGoal.textContent = `${goalPercent}%`;
-    if (statsGoalFill) statsGoalFill.style.width = `${goalPercent}%`;
-  }
 
-  function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `toast-notification ${type}`;
-    toast.innerHTML = `
-      <div class="toast-message">${message}</div>
-    `;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-      toast.classList.add('show');
-    }, 10);
-    
-    setTimeout(() => {
-      toast.classList.remove('show');
-      setTimeout(() => toast.remove(), 300);
-    }, 3000);
-  }
-
-  if (clearBtn) {
     clearBtn.addEventListener('click', () => {
-      if (confirm('Вы уверены, что хотите очистить всю историю расчётов?')) {
-        localStorage.removeItem('caloHistory');
-        loadHistory();
-        updateStats();
-        showToast('История расчётов очищена', 'success');
-      }
-    });
-  }
+        if (!confirm('Удалить все расчёты из истории? Сохранённые меню останутся.')) return;
 
-  const style = document.createElement('style');
-  style.textContent = `
-    .history-entry {
-      opacity: 0;
-      transform: translateY(20px);
-      animation: fadeInUp 0.6s ease-out forwards;
-    }
-    
-    @keyframes fadeInUp {
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-  `;
-  document.head.appendChild(style);
+        try {
+            localStorage.removeItem(STORAGE_KEYS.history);
+        } catch {
+            showToast('Не удалось очистить историю', 'error');
+            return;
+        }
+        renderHistory();
+        showToast('История очищена');
+    });
 });

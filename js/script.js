@@ -1,559 +1,276 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const form = document.getElementById('calorie-form');
-    const resultEl = document.getElementById('result');
-    const ctx = document.getElementById('bjuChart')?.getContext('2d');
-    const weightCtx = document.getElementById('weightChart')?.getContext('2d');
-    const menuBtn = document.getElementById('show-menu-btn');
-
     if (!form) return;
 
-    let chart = null;
-    let weightChart = null;
-    let mealDatabase = null;
-    let mealPlanner = null;
-    let mealRenderer = null;
-    let mealModal = null;
+    const resultEl = document.getElementById('result');
+    const resultActions = document.getElementById('result-actions');
+    const menuBtn = document.getElementById('show-menu-btn');
+    const shareBtn = document.getElementById('share-btn');
+    const forecastSection = document.getElementById('forecast');
+    const forecastNote = document.getElementById('forecast-note');
+    const weightChart = document.getElementById('weight-chart');
+
     let lastCalculation = null;
 
-    try {
-        mealDatabase = new MealDatabase();
-        await mealDatabase.init();
-        mealPlanner = new MealPlanner(mealDatabase);
-        mealRenderer = new MealRenderer();
-        mealModal = new MealModal(mealRenderer);
-        console.log('Модули меню успешно инициализированы');
-    } catch (error) {
-        console.error('Ошибка инициализации модулей меню:', error);
-    }
+    const mascot = new Mascot(document.getElementById('calc-mascot'));
+    const activityHint = document.getElementById('activity-hint');
 
-    const animatedDataLabelPlugin = {
-        id: 'animatedDataLabel',
-        afterDatasetsDraw(chart) {
-            const ctx = chart.ctx;
-            chart.data.datasets.forEach((dataset, i) => {
-                const meta = chart.getDatasetMeta(i);
-                meta.data.forEach((arc, index) => {
-                    const data = dataset.data[index];
-                    if (data === 0) return;
-                    const label = data + ' г';
-                    const centerPoint = arc.getCenterPoint();
-                    
-                    ctx.save();
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 14px DM Sans, Arial, sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-                    ctx.shadowBlur = 4;
-                    ctx.fillText(label, centerPoint.x, centerPoint.y);
-                    ctx.restore();
-                });
-            });
-        },
-    };
+    resultEl.innerHTML = renderNormSummary(null);
+    mascot.say('Заполните возраст, рост и вес — и я покажу, сколько вам нужно есть в день.');
 
-    animateFormElements();
-
-    function animateFormElements() {
-        const formElements = form.querySelectorAll('.calc-group');
-        formElements.forEach((element, index) => {
-            element.style.animationDelay = `${index * 0.1}s`;
-            element.classList.add('fadeIn');
-        });
-    }
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.textContent;
-        submitBtn.textContent = 'Рассчитываем...';
-        submitBtn.classList.add('loading');
-        
-        await new Promise(resolve => setTimeout(resolve, 800));
-        calculateCalories();
-        
-        submitBtn.textContent = originalText;
-        submitBtn.classList.remove('loading');
+    form.addEventListener('change', (event) => {
+        if (event.target.name === 'activity') {
+            activityHint.textContent = event.target.dataset.hint;
+        }
     });
 
-    async function calculateCalories() {
-        resultEl.innerHTML = `
-            <div class="result-placeholder">
-                <div class="skeleton skeleton-text" style="width: 80%; margin: 10px auto;"></div>
-                <div class="skeleton skeleton-text" style="width: 60%; margin: 10px auto;"></div>
-                <div class="skeleton skeleton-text" style="width: 70%; margin: 10px auto;"></div>
-            </div>
-        `;
+    const mealDatabase = new MealDatabase();
+    const mealPlanner = new MealPlanner(mealDatabase);
+    const mealRenderer = new MealRenderer();
+    const mealMenu = new MealMenu(mealRenderer);
+    const databaseReady = mealDatabase.init();
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
 
-        const gender = form.gender.value;
-        const age = +form.age.value;
-        const height = +form.height.value;
-        const weight = +form.weight.value;
-        const activity = +form.activity.value;
-        const goal = form.goal.value;
+        const input = readNormInput(form);
+        if (!input) return;
 
-        if (age < 10 || age > 120 || height < 50 || height > 250 || weight < 20 || weight > 300) {
-            showError('Проверь корректность введённых данных.');
-            return;
+        lastCalculation = calculateNorm(input);
+        showResult(lastCalculation);
+        renderBreakdown(lastCalculation);
+        renderForecast(lastCalculation);
+        saveToHistory(lastCalculation);
+
+        if (window.matchMedia('(max-width: 960px)').matches) {
+            resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+    });
 
-        let bmr = gender === 'male'
-            ? 10 * weight + 6.25 * height - 5 * age + 5
-            : 10 * weight + 6.25 * height - 5 * age - 161;
-
-        let tdee = bmr * activity;
-
-        switch (goal) {
-            case 'lose': tdee *= 0.85; break;
-            case 'gain': tdee *= 1.15; break;
-        }
-
-        const calories = Math.round(tdee);
-
-        let proteinPerKg, fatPerKg, carbPerKg;
-        switch (goal) {
-            case 'lose':
-                proteinPerKg = 2.2; fatPerKg = 0.8; carbPerKg = 2.5;
-                break;
-            case 'gain':
-                proteinPerKg = 2.0; fatPerKg = 1.2; carbPerKg = 5.0;
-                break;
-            default:
-                proteinPerKg = 1.8; fatPerKg = 1.0; carbPerKg = 4.0;
-        }
-
-        const proteinGrams = Math.round(weight * proteinPerKg);
-        const fatGrams = Math.round(weight * fatPerKg);
-        const carbGrams = Math.round(weight * carbPerKg);
-
-        const heightM = height / 100;
-        const bmi = +(weight / (heightM * heightM)).toFixed(1);
-        let bmiStatus = '';
-        let bmiColor = '';
-
-        if (bmi < 16) {
-            bmiStatus = 'Выраженный дефицит массы';
-            bmiColor = '#e53935';
-        } else if (bmi < 18.5) {
-            bmiStatus = 'Недостаточный вес';
-            bmiColor = '#ff9800';
-        } else if (bmi < 25) {
-            bmiStatus = 'Нормальный вес';
-            bmiColor = '#4caf50';
-        } else if (bmi < 30) {
-            bmiStatus = 'Избыточный вес';
-            bmiColor = '#ff9800';
-        } else if (bmi < 35) {
-            bmiStatus = 'Ожирение I степени';
-            bmiColor = '#e53935';
-        } else if (bmi < 40) {
-            bmiStatus = 'Ожирение II степени';
-            bmiColor = '#e53935';
-        } else {
-            bmiStatus = 'Ожирение III степени';
-            bmiColor = '#b71c1c';
-        }
-
-        lastCalculation = {
-            calories,
-            proteinGrams,
-            fatGrams,
-            carbGrams,
-            bmi,
-            weight,
-            height,
-            age,
-            gender,
-            goal,
-            activity,
-            bmiStatus,
-            bmiColor
-        };
-
-        showResults(calories, proteinGrams, fatGrams, carbGrams, bmi, bmiStatus, bmiColor);
-        
-        createAnimatedCharts(proteinGrams, fatGrams, carbGrams, weight, bmr, activity, calories);
-        
-        saveToHistory(calories, proteinGrams, fatGrams, carbGrams);
-        
-        if (menuBtn && mealDatabase && mealDatabase.isReady()) {
-            menuBtn.style.display = 'block';
-            menuBtn.classList.add('pulse-once');
-        } else if (menuBtn && !mealDatabase?.isReady()) {
-            menuBtn.style.display = 'block';
-            menuBtn.style.opacity = '0.6';
-            menuBtn.title = 'База меню загружается, попробуйте позже';
-        }
+    function showResult(norm) {
+        resultEl.innerHTML = renderNormSummary(norm);
+        resultEl.classList.remove('is-revealed');
+        void resultEl.offsetWidth;
+        resultEl.classList.add('is-revealed');
+        resultActions.hidden = false;
+        mascot.say(buildNormTips(norm), 'wow');
     }
 
-    function showResults(calories, protein, fat, carbs, bmi, bmiStatus, bmiColor) {
-        resultEl.classList.add('pulse-once');
+    function renderBreakdown(norm) {
+        const mifflin = `10 × ${formatNumber(norm.weight, 1)} + 6,25 × ${norm.height} − 5 × ${norm.age} ${norm.gender === 'female' ? '− 161' : '+ 5'}`;
+        const goalStep = {
+            lose: `${formatNumber(norm.maintenanceCalories)} − 15 %`,
+            maintain: `${formatNumber(norm.maintenanceCalories)}, без поправки`,
+            gain: `${formatNumber(norm.maintenanceCalories)} + 15 %`
+        }[norm.goal];
+        const perKg = MACROS_PER_KG[norm.goal];
+        const scale = norm.macroScale < 1 ? ` × ${formatNumber(norm.macroScale, 2)}` : '';
 
-        resultEl.innerHTML = `
-            <div class="fadeIn">
-                <div class="result-hero">
-                    <span class="result-label">Суточный калораж</span>
-                    <span class="result-value">${calories} ккал</span>
-                </div>
-                <div class="result-stats">
-                    <div class="result-stat">
-                        <span class="result-stat-value">${protein} г</span>
-                        <span class="result-stat-label">Белки</span>
-                    </div>
-                    <div class="result-stat">
-                        <span class="result-stat-value">${fat} г</span>
-                        <span class="result-stat-label">Жиры</span>
-                    </div>
-                    <div class="result-stat">
-                        <span class="result-stat-value">${carbs} г</span>
-                        <span class="result-stat-label">Углеводы</span>
-                    </div>
-                </div>
-                <div class="result-bmi">
-                    <span class="result-bmi-label">ИМТ ${bmi}</span>
-                    <span class="result-bmi-value" style="color: ${bmiColor};">${bmiStatus}</span>
-                </div>
-            </div>
-        `;
-
-        setTimeout(() => {
-            resultEl.classList.remove('pulse-once');
-        }, 600);
-    }
-
-    function createAnimatedCharts(proteinGrams, fatGrams, carbGrams, weight, bmr, activity, calories) {
-        createAnimatedBJUDiagram(proteinGrams, fatGrams, carbGrams);
-        createAnimatedWeightChart(weight, bmr, activity, calories);
-    }
-
-    function createAnimatedBJUDiagram(proteinGrams, fatGrams, carbGrams) {
-        if (!ctx) return;
-        
-        const data = {
-            labels: ['Белки', 'Жиры', 'Углеводы'],
-            datasets: [{
-                label: 'Граммы',
-                data: [0, 0, 0],
-                backgroundColor: [
-                    'rgba(252, 80, 0, 0.85)',
-                    'rgba(255, 152, 0, 0.8)',
-                    'rgba(33, 150, 243, 0.8)'
-                ],
-                borderColor: [
-                    'rgb(252, 80, 0)',
-                    'rgb(255, 152, 0)',
-                    'rgb(33, 150, 243)'
-                ],
-                borderWidth: 2,
-                hoverOffset: 20,
-                borderRadius: 8,
-            }],
-        };
-
-        const options = {
-            responsive: false,
-            animation: {
-                animateScale: true,
-                animateRotate: true,
-                duration: 1000,
-                easing: 'easeOutQuart'
-            },
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        font: { size: 14, weight: '500', family: 'DM Sans' },
-                        color: 'var(--text-color)'
-                    },
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => `${context.label}: ${context.parsed} г`,
-                    },
-                    backgroundColor: 'var(--card-bg)',
-                    titleColor: 'var(--text-color)',
-                    bodyColor: 'var(--text-color)',
-                    borderColor: 'var(--primary-color)',
-                    borderWidth: 1
-                },
-            },
-            cutout: '60%',
-        };
-
-        if (chart) chart.destroy();
-
-        chart = new Chart(ctx, {
-            type: 'doughnut',
-            data: data,
-            options: options,
-            plugins: [animatedDataLabelPlugin],
-        });
-
-        setTimeout(() => {
-            chart.data.datasets[0].data = [proteinGrams, fatGrams, carbGrams];
-            chart.update();
-        }, 500);
-    }
-
-    function createAnimatedWeightChart(currentWeight, bmr, activity, targetCalories) {
-        if (!weightCtx) return;
-
-        const maintenanceCalories = bmr * activity;
-        const calorieDiffPerDay = targetCalories - maintenanceCalories;
-        const monthlyWeightChange = +(calorieDiffPerDay * 30 / 7700).toFixed(2);
-
-        const weightData = Array.from({ length: 12 }, (_, i) =>
-            +(currentWeight + monthlyWeightChange * (i + 1)).toFixed(1)
-        );
-
-        const monthLabels = [
-            '1 мес', '2 мес', '3 мес', '4 мес', '5 мес', '6 мес',
-            '7 мес', '8 мес', '9 мес', '10 мес', '11 мес', '12 мес'
+        const rows = [
+            ['Базовый обмен', mifflin, `${formatNumber(norm.bmr)} ккал`],
+            [`Активность: ${ACTIVITY_LEVELS[String(norm.activity)].toLowerCase()}`, `${formatNumber(norm.bmr)} × ${String(norm.activity).replace('.', ',')}`, `${formatNumber(norm.maintenanceCalories)} ккал`],
+            [`Цель: ${GOAL_NAMES[norm.goal].toLowerCase()}`, goalStep, `${formatNumber(norm.calories)} ккал`],
+            ['Белки', `${formatNumber(norm.weight, 1)} кг × ${formatNumber(perKg.protein, 1)} г${scale}`, `${norm.proteinGrams} г`],
+            ['Жиры', `${formatNumber(norm.weight, 1)} кг × ${formatNumber(perKg.fat, 1)} г${scale}`, `${norm.fatGrams} г`],
+            ['Углеводы', `(${formatNumber(norm.calories)} − ${norm.proteinGrams} × 4 − ${norm.fatGrams} × 9) ÷ 4`, `${norm.carbGrams} г`]
         ];
 
-        if (weightChart) weightChart.destroy();
+        const scaleNote = norm.macroScale < 1
+            ? `<p class="breakdown-note">Белки и жиры по формуле заняли бы больше ${Math.round(MAX_PROTEIN_AND_FAT_SHARE * 100)} % калорий, поэтому обе величины уменьшены в одинаковой пропорции — так в рационе остаётся место для углеводов.</p>`
+            : '';
 
-        weightChart = new Chart(weightCtx, {
-            type: 'bar',
-            data: {
-                labels: monthLabels,
-                datasets: [{
-                    label: 'Вес (кг)',
-                    data: new Array(12).fill(currentWeight),
-                    backgroundColor: 'rgba(252, 80, 0, 0.65)',
-                    borderColor: 'rgb(252, 80, 0)',
-                    borderWidth: 2,
-                    borderRadius: 8,
-                    barThickness: 28,
-                }]
-            },
-            options: {
-                responsive: false,
-                animation: {
-                    duration: 2000,
-                    easing: 'easeOutQuart'
-                },
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        ticks: {
-                            callback: value => value + ' кг',
-                            font: { family: 'DM Sans' },
-                            color: 'var(--text-color)'
-                        },
-                        grid: {
-                            color: 'var(--border-color)'
-                        }
-                    },
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            font: { family: 'DM Sans' },
-                            color: 'var(--text-color)'
-                        }
-                    }
-                },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => `Вес: ${ctx.parsed.y} кг`
-                        },
-                        backgroundColor: 'var(--card-bg)',
-                        titleColor: 'var(--text-color)',
-                        bodyColor: 'var(--text-color)',
-                        borderColor: 'var(--primary-color)'
-                    }
-                }
-            }
-        });
-
-        setTimeout(() => {
-            weightChart.data.datasets[0].data = weightData;
-            weightChart.update();
-        }, 1000);
+        document.getElementById('breakdown').innerHTML = rows.map(([name, formula, value]) => `
+            <div><dt>${name}</dt><dd><span class="breakdown-formula">${formula}</span><strong>${value}</strong></dd></div>
+        `).join('');
+        const section = document.getElementById('breakdown-section');
+        section.querySelector('.breakdown-note')?.remove();
+        section.insertAdjacentHTML('beforeend', scaleNote);
+        section.hidden = false;
     }
 
-    function showError(message) {
-        resultEl.classList.add('shake');
-        resultEl.innerHTML = `<div class="result-placeholder"><strong style="color: var(--error-color);">${message}</strong></div>`;
-        
-        setTimeout(() => {
-            resultEl.classList.remove('shake');
-        }, 500);
-    }
+    function renderForecast(norm) {
+        const dailyDifference = norm.calories - norm.maintenanceCalories;
+        const monthlyChange = (dailyDifference * 30.4) / 7700;
 
-    function saveToHistory(calories, proteinGrams, fatGrams, carbGrams) {
-        const historyItem = {
-            date: new Date().toLocaleString('ru-RU'),
-            calories,
-            proteinGrams,
-            fatGrams,
-            carbGrams,
-        };
+        forecastSection.hidden = false;
 
-        let history = JSON.parse(localStorage.getItem('caloHistory')) || [];
-        const last = history[0];
-        
-        if (!last || JSON.stringify(last) !== JSON.stringify(historyItem)) {
-            history.unshift(historyItem);
-            if (history.length > 20) history = history.slice(0, 20);
-            localStorage.setItem('caloHistory', JSON.stringify(history));
-            showNotification('Расчет сохранен в историю!', 'success');
-        }
-    }
-
-    function showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `toast-notification ${type}`;
-        notification.innerHTML = `
-            <div class="toast-message">${message}</div>
-        `;
-
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.classList.add('show');
-        }, 10);
-
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
-    }
-
-    if (menuBtn) {
-        menuBtn.addEventListener('click', async () => {
-            if (!lastCalculation) {
-                showNotification('Сначала выполните расчет калорий!', 'warning');
-                return;
-            }
-            
-            if (!mealDatabase || !mealDatabase.isReady || !mealDatabase.isReady()) {
-                showNotification('База данных меню загружается, попробуйте через секунду', 'warning');
-                return;
-            }
-            
-            try {
-                if (mealModal) {
-                    mealModal.showLoading();
-                }
-                
-                console.log('Генерация меню для:', {
-                    calories: lastCalculation.calories,
-                    bmi: lastCalculation.bmi,
-                    goal: lastCalculation.goal
-                });
-                
-                const menu = mealPlanner.generateDailyMenu(
-                    lastCalculation.calories,
-                    lastCalculation.bmi,
-                    lastCalculation.goal
-                );
-                
-                console.log('Сгенерированное меню:', menu);
-                
-                if (!menu) {
-                    throw new Error('Не удалось сгенерировать меню');
-                }
-                
-                if (mealModal) {
-                    mealModal.show(menu, lastCalculation);
-                }
-                
-                menuBtn.classList.add('pulse-once');
-                setTimeout(() => menuBtn.classList.remove('pulse-once'), 600);
-                
-            } catch (error) {
-                console.error('Ошибка генерации меню:', error);
-                showNotification('Ошибка при генерации меню. Попробуйте позже.', 'error');
-                
-                if (mealModal && mealModal.modal) {
-                    mealModal.hide();
-                }
-            }
-        });
-    }
-
-    document.addEventListener('requestMealRefresh', async (e) => {
-        const { category, currentMealId, menuData } = e.detail;
-        
-        if (!mealPlanner || !lastCalculation) return;
-        
-        try {
-            const newMeal = mealPlanner.generateAlternative(
-                category,
-                currentMealId,
-                lastCalculation.calories,
-                lastCalculation.bmi,
-                lastCalculation.goal
-            );
-            
-            if (newMeal && mealRenderer) {
-                mealRenderer.updateCategory(category, newMeal);
-                showNotification('Блюдо заменено!', 'success');
-            } else {
-                showNotification('Нет альтернативных блюд', 'warning');
-            }
-        } catch (error) {
-            console.error('Ошибка замены блюда:', error);
-            showNotification('Не удалось заменить блюдо', 'error');
-        }
-    });
-
-    // ========== ДОБАВЛЕННЫЙ ОБРАБОТЧИК ДЛЯ ЗАГРУЗКИ СОХРАНЕННОГО МЕНЮ ==========
-    document.addEventListener('loadSavedMenu', (e) => {
-        const savedMenu = e.detail;
-        if (!savedMenu || !mealModal) {
-            showNotification('Не удалось загрузить меню', 'error');
+        if (norm.goal === 'maintain') {
+            forecastNote.textContent = `При поддерживающей норме вес остаётся примерно на уровне ${formatNumber(norm.weight, 1)} кг.`;
+            weightChart.hidden = true;
             return;
         }
-        
-        const fakeUserData = {
-            calories: savedMenu.totalCalories,
-            bmi: savedMenu.bmi || 25,
-            goal: savedMenu.goal || 'maintain'
-        };
-        
-        if (mealModal) {
-            mealModal.show(savedMenu, fakeUserData);
-        }
-        
-        if (resultEl) {
-            resultEl.innerHTML = `
-                <div>
-                    <strong>Суточный калораж:</strong> <span style="color: var(--primary-color);">${savedMenu.totalCalories} ккал</span><br>
-                    <strong>Загружено из сохраненных</strong>
-                </div>
+
+        const weights = Array.from({ length: 13 }, (_, month) => norm.weight + monthlyChange * month);
+        const finalWeight = weights[weights.length - 1];
+        const direction = monthlyChange < 0 ? 'минус' : 'плюс';
+
+        forecastNote.textContent =
+            `Примерно ${direction} ${formatNumber(Math.abs(monthlyChange), 1)} кг в месяц, через год — около ${formatNumber(finalWeight, 1)} кг. ` +
+            'Это линейная оценка: на деле темп со временем замедляется, поэтому пересчитывайте норму каждые 4–6 недель.';
+        weightChart.hidden = false;
+        weightChart.innerHTML = buildForecastSvg(weights);
+    }
+
+    let resizeFrame = null;
+    window.addEventListener('resize', () => {
+        if (!lastCalculation?.maintenanceCalories || forecastSection.hidden) return;
+        cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(() => renderForecast(lastCalculation));
+    });
+
+    function buildForecastSvg(weights) {
+        const horizontalPadding = parseFloat(getComputedStyle(weightChart).paddingLeft) * 2;
+        const width = Math.max(280, Math.round(weightChart.clientWidth - horizontalPadding));
+        const height = width < 500 ? 220 : 260;
+        const padding = { top: 28, right: 16, bottom: 32, left: 40 };
+        const innerWidth = width - padding.left - padding.right;
+        const innerHeight = height - padding.top - padding.bottom;
+
+        const lowest = Math.min(...weights);
+        const highest = Math.max(...weights);
+        const step = [1, 2, 5, 10, 20].find((candidate) => (highest - lowest) / candidate <= 4) || 20;
+        const minWeight = Math.floor(lowest / step) * step;
+        const maxWeight = Math.max(Math.ceil(highest / step) * step, minWeight + step);
+        const range = maxWeight - minWeight;
+
+        const x = (month) => padding.left + (month / 12) * innerWidth;
+        const y = (weight) => padding.top + (1 - (weight - minWeight) / range) * innerHeight;
+
+        const gridLines = Array.from({ length: range / step + 1 }, (_, i) => {
+            const value = minWeight + step * i;
+            return `
+                <line class="grid-line" x1="${padding.left}" x2="${width - padding.right}" y1="${y(value)}" y2="${y(value)}"></line>
+                <text class="axis-text" x="${padding.left - 10}" y="${y(value) + 4}" text-anchor="end">${value}</text>
             `;
+        }).join('');
+
+        const markedMonths = [0, 3, 6, 9, 12];
+        const monthLabels = markedMonths.map((month) => `
+            <text class="axis-text" x="${x(month)}" y="${height - 8}" text-anchor="middle">${month === 0 ? 'сейчас' : `${month} мес`}</text>
+        `).join('');
+
+        const linePoints = weights.map((weight, month) => `${x(month)},${y(weight)}`).join(' ');
+        const areaPoints = `${x(0)},${padding.top + innerHeight} ${linePoints} ${x(12)},${padding.top + innerHeight}`;
+
+        const points = markedMonths.map((month) => `
+            <circle class="point" cx="${x(month)}" cy="${y(weights[month])}" r="4.5"></circle>
+        `).join('');
+
+        const edgeLabels = [0, 12].map((month) => `
+            <text class="point-label" x="${x(month)}" y="${y(weights[month]) - 12}" text-anchor="${month === 0 ? 'start' : 'end'}">${formatNumber(weights[month], 1)} кг</text>
+        `).join('');
+
+        return `
+            <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Прогноз веса: с ${formatNumber(weights[0], 1)} до ${formatNumber(weights[12], 1)} кг за 12 месяцев">
+                ${gridLines}
+                ${monthLabels}
+                <polygon class="trend-area" points="${areaPoints}"></polygon>
+                <polyline class="trend" points="${linePoints}"></polyline>
+                ${points}
+                ${edgeLabels}
+            </svg>
+        `;
+    }
+
+    function saveToHistory(norm) {
+        const history = readStorage(STORAGE_KEYS.history, []);
+        history.unshift({
+            date: new Date().toISOString(),
+            calories: norm.calories,
+            proteinGrams: norm.proteinGrams,
+            fatGrams: norm.fatGrams,
+            carbGrams: norm.carbGrams,
+            goal: norm.goal,
+            bmi: norm.bmi,
+            weight: norm.weight
+        });
+
+        if (writeStorage(STORAGE_KEYS.history, history.slice(0, 20))) {
+            showToast('Расчёт сохранён в историю');
         }
-        
-        showNotification('Меню загружено!', 'success');
+    }
+
+    async function openMenu(menu, userData) {
+        await databaseReady;
+        mealMenu.show(menu, userData);
+    }
+
+    menuBtn.addEventListener('click', async () => {
+        if (!lastCalculation) return;
+
+        await databaseReady;
+        const menu = mealPlanner.generateDailyMenu(lastCalculation.calories, lastCalculation.bmi, lastCalculation.goal);
+        mealMenu.show(menu, lastCalculation);
     });
 
-    const numberInputs = document.querySelectorAll('input[type="number"]');
-    numberInputs.forEach(input => {
-        input.addEventListener('focus', function() {
-            this.parentElement.classList.add('pulse-once');
-            setTimeout(() => {
-                this.parentElement.classList.remove('pulse-once');
-            }, 600);
-        });
+    shareBtn.addEventListener('click', async () => {
+        if (!lastCalculation) return;
+
+        const text =
+            `Моя норма по CaloTrack: ${formatNumber(lastCalculation.calories)} ккал в день. ` +
+            `Белки ${lastCalculation.proteinGrams} г, жиры ${lastCalculation.fatGrams} г, углеводы ${lastCalculation.carbGrams} г. ` +
+            `Цель: ${GOAL_NAMES[lastCalculation.goal].toLowerCase()}.`;
+
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: 'Моя норма калорий', text });
+                return;
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+            }
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            showToast('Результат скопирован');
+        } catch {
+            showToast('Не удалось скопировать результат', 'error');
+        }
     });
 
-    const productButtons = document.querySelectorAll('.product-button');
-    productButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            this.classList.add('pulse-once');
-            setTimeout(() => {
-                this.classList.remove('pulse-once');
-            }, 600);
-        });
+    document.addEventListener('requestMealRefresh', (event) => {
+        const { category, currentMealId } = event.detail;
+        if (!lastCalculation) return;
+
+        const newMeal = mealPlanner.generateAlternative(
+            category,
+            currentMealId,
+            lastCalculation.calories,
+            lastCalculation.bmi,
+            lastCalculation.goal
+        );
+
+        if (newMeal) {
+            mealRenderer.updateCategory(category, newMeal);
+        } else {
+            showToast('Других подходящих блюд нет');
+        }
     });
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('weight')) {
+        for (const name of ['gender', 'age', 'height', 'weight', 'activity', 'goal']) {
+            if (params.has(name)) form.elements[name].value = params.get(name);
+        }
+        activityHint.textContent = form.querySelector('input[name="activity"]:checked').dataset.hint;
+        history.replaceState(null, '', window.location.pathname);
+        form.requestSubmit();
+    }
+
+    const savedMenuId = params.get('menu');
+    if (savedMenuId) {
+        const saved = readStorage(STORAGE_KEYS.savedMenus, []).find((item) => String(item.id) === savedMenuId);
+        history.replaceState(null, '', window.location.pathname);
+
+        if (saved) {
+            lastCalculation = {
+                calories: saved.menu.totalCalories,
+                bmi: saved.menu.bmi,
+                goal: saved.menu.goal || 'maintain'
+            };
+            openMenu(saved.menu, lastCalculation);
+        } else {
+            showToast('Это меню не найдено', 'error');
+        }
+    }
 });

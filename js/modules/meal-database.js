@@ -1,22 +1,10 @@
 class MealDatabase {
     constructor() {
-        // Инициализируем с пустыми массивами сразу
-        this.meals = {
-            breakfast: [],
-            lunch: [],
-            dinner: [],
-            snack: []
-        };
-        this.categories = null;
-        this.isLoaded = false;
         this.loadingPromise = null;
-        
-        // Сразу заполняем дефолтными данными
         this.initDefaultData();
     }
 
     initDefaultData() {
-        // Дефолтные блюда - гарантированно работают
         this.meals = {
             breakfast: [
                 {
@@ -229,110 +217,48 @@ class MealDatabase {
     }
 
     async init() {
-        if (this.isLoaded) return true;
-        if (this.loadingPromise) return this.loadingPromise;
-        
-        this.loadingPromise = this.loadDatabase();
+        if (!this.loadingPromise) {
+            this.loadingPromise = this.loadDatabase();
+        }
         return this.loadingPromise;
     }
 
     async loadDatabase() {
         try {
-            // Пытаемся загрузить внешний JSON
             const response = await fetch('data/meals.json');
             if (response.ok) {
                 const data = await response.json();
-                
-                // Проверяем и обновляем данные
-                if (data.breakfast && Array.isArray(data.breakfast)) {
-                    this.meals.breakfast = data.breakfast;
-                }
-                if (data.lunch && Array.isArray(data.lunch)) {
-                    this.meals.lunch = data.lunch;
-                }
-                if (data.dinner && Array.isArray(data.dinner)) {
-                    this.meals.dinner = data.dinner;
-                }
-                if (data.snack && Array.isArray(data.snack)) {
-                    this.meals.snack = data.snack;
-                }
-                
-                console.log('Внешняя база меню загружена');
-            } else {
-                console.log('Используем встроенную базу меню');
-            }
-            
-            // Пытаемся загрузить категории
-            try {
-                const catResponse = await fetch('data/categories.json');
-                if (catResponse.ok) {
-                    const catData = await catResponse.json();
-                    if (catData.categories) {
-                        this.categories = catData;
+                for (const category of this.getAllCategories()) {
+                    if (Array.isArray(data[category])) {
+                        this.meals[category] = data[category];
                     }
                 }
-            } catch (e) {
-                console.log('Используем встроенные категории');
             }
-            
-            this.isLoaded = true;
-            console.log('База данных готова, категории:', Object.keys(this.meals));
-            return true;
-            
+
+            const categoriesResponse = await fetch('data/categories.json');
+            if (categoriesResponse.ok) {
+                const categoriesData = await categoriesResponse.json();
+                if (categoriesData.categories) {
+                    this.categories = categoriesData;
+                }
+            }
         } catch (error) {
-            console.error('Ошибка загрузки, используем встроенную базу:', error);
-            this.isLoaded = true;
-            return true;
+            console.warn('Не удалось загрузить базу блюд, используется встроенная', error);
         }
     }
 
-    getMealsByCategory(category, healthProfile = null) {
-        if (!this.meals) {
-            console.warn('meals не инициализирован');
-            return [];
-        }
-        
-        const mealsArray = this.meals[category];
-        
-        if (!mealsArray || !Array.isArray(mealsArray)) {
-            console.warn(`Категория ${category} не найдена, возвращаем пустой массив`);
-            return [];
-        }
-        
-        if (!healthProfile) {
-            return mealsArray;
-        }
-        
-        // Фильтруем по профилю здоровья
-        return mealsArray.filter(meal => {
-            if (!meal.healthProfiles) return true;
-            const profile = meal.healthProfiles[healthProfile];
-            return profile ? profile.recommended !== false : true;
-        });
-    }
-
-    /**
-     * НОВЫЙ МЕТОД: Получение блюд по категории с учетом цели
-     */
     getMealsByCategoryWithGoal(category, healthProfile, goal) {
-        const mealsArray = this.meals[category];
-        if (!mealsArray || !Array.isArray(mealsArray)) return [];
-        
-        // Для набора массы - игнорируем recommended, берем все блюда
+        const mealsArray = this.meals[category] || [];
+
         if (goal === 'gain') {
-            // Возвращаем все блюда, отсортированные по калорийности (высокие в начале)
             return [...mealsArray].sort((a, b) => b.calories - a.calories);
         }
-        
-        // Для похудения или поддержания - фильтруем по recommended
-        return mealsArray.filter(meal => {
-            if (!meal.healthProfiles) return true;
-            const profile = meal.healthProfiles[healthProfile];
-            // Для похудения берем только рекомендованные
+
+        return mealsArray.filter((meal) => {
+            const profile = meal.healthProfiles?.[healthProfile];
             if (goal === 'lose') {
-                return profile && profile.recommended !== false;
+                return Boolean(profile) && profile.recommended !== false;
             }
-            // Для поддержания берем рекомендованные или с нейтральным множителем
             return profile ? profile.recommended !== false : true;
         });
     }
@@ -342,36 +268,6 @@ class MealDatabase {
     }
 
     getCategoryInfo(category) {
-        if (this.categories?.categories?.[category]) {
-            return this.categories.categories[category];
-        }
-        
-        const defaults = {
-            breakfast: { name: 'Завтрак', caloriePercent: 30, icon: '' },
-            lunch: { name: 'Обед', caloriePercent: 35, icon: '' },
-            dinner: { name: 'Ужин', caloriePercent: 25, icon: '' },
-            snack: { name: 'Перекус', caloriePercent: 10, icon: '' }
-        };
-        
-        return defaults[category] || { name: category, caloriePercent: 25, icon: '' };
-    }
-
-    getMealById(id) {
-        const categories = this.getAllCategories();
-        
-        for (const category of categories) {
-            const mealsArray = this.meals[category];
-            if (mealsArray && Array.isArray(mealsArray)) {
-                const meal = mealsArray.find(m => m.id === id);
-                if (meal) return { ...meal, category };
-            }
-        }
-        return null;
-    }
-
-    isReady() {
-        return true;
+        return this.categories.categories[category] || { name: category, caloriePercent: 25 };
     }
 }
-
-window.MealDatabase = MealDatabase;

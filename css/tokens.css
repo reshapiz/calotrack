@@ -1,43 +1,86 @@
+@font-face {
+  font-family: 'Onest';
+  src: url('../fonts/onest-variable.woff') format('woff');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  src: url('../fonts/nunito-black.woff') format('woff');
+  font-weight: 900;
+  font-display: swap;
+}
+
 :root {
-  /* Colors */
-  --color-ember: #fc5000;
-  --color-ember-dark: #d94600;
-  --color-plasma-violet: #524ae9;
-  --color-sulfur: #f5f28e;
-  --color-limestone: #f7f6f2;
-  --color-pumice: #e2e2df;
-  --color-obsidian: #070607;
-  --color-chalk: #ffffff;
+  --paper: #f1ebe2;
+  --oat: #e9dfd2;
+  --oat-deep: #ddd0be;
+  --card: #ffffff;
+  --ink: #202020;
+  --ink-soft: #6a6158;
+  --on-ink: #ffffff;
+  --on-pastel: #202020;
 
-  /* Typography */
-  --font-heading: 'Anton', 'PP Neue Corp Compact', ui-sans-serif, system-ui, sans-serif;
-  --font-body: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --blue: #aac9f7;
+  --blue-strong: #72a4f2;
 
-  /* Spacing */
-  --spacing-4: 4px;
-  --spacing-8: 8px;
-  --spacing-9: 9px;
-  --spacing-10: 10px;
-  --spacing-12: 12px;
-  --spacing-16: 16px;
-  --spacing-18: 18px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-32: 32px;
-  --spacing-40: 40px;
-  --spacing-48: 48px;
-  --spacing-56: 56px;
-  --spacing-64: 64px;
-  --spacing-80: 80px;
-  --spacing-92: 92px;
+  --protein: #f4b6aa;
+  --fat: #f4d585;
+  --carbs: #bfdcb4;
 
-  /* Border radius */
+  --success: #3d7a4a;
+  --warning: #8a5a00;
+  --danger: #b23b2a;
+  --danger-wash: #f8ddd7;
+
+  --font-display: 'Nunito', 'Arial Rounded MT Bold', sans-serif;
+  --font-body: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --text-caption: 0.875rem;
+  --text-body: 1rem;
+  --text-subheading: 1.25rem;
+  --text-heading-sm: 1.5rem;
+  --text-heading: 1.875rem;
+  --text-display: clamp(2.75rem, 1.6rem + 4.2vw, 4.5rem);
+  --text-number: clamp(3.5rem, 2.4rem + 4vw, 5rem);
+
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-28: 28px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-64: 64px;
+  --space-80: 80px;
+  --space-96: 96px;
+
+  --radius-pill: 9999px;
+  --radius-card: 40px;
+  --radius-feature: 24px;
   --radius-small: 16px;
-  --radius-medium: 20px;
-  --radius-cards: 40px;
-  --radius-pills: 800px;
-  --radius-inputs: 100px;
 
-  /* Layout */
-  --page-max-width: 1280px;
+  --page-max-width: 1200px;
+}
+
+:root[data-theme='dark'] {
+  --paper: #1d1916;
+  --oat: #2b2520;
+  --oat-deep: #3a322b;
+  --card: #26211d;
+  --ink: #f2ebe2;
+  --ink-soft: #b8ab9d;
+  --on-ink: #202020;
+
+  --protein: #e9a094;
+  --fat: #e6c268;
+  --carbs: #a6c99a;
+
+  --success: #8fd19e;
+  --warning: #f0c35c;
+  --danger: #ff9b8a;
+  --danger-wash: #4a2a24;
 }

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Что умеет CaloTrack и как он устроен.">
+  <meta name="theme-color" content="#f1ebe2">
+  <title>О проекте — CaloTrack</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preload" href="fonts/onest-variable.woff" as="font" type="font/woff" crossorigin>
+  <link rel="preload" href="fonts/nunito-black.woff" as="font" type="font/woff" crossorigin>
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/theme-manager.js"></script>
+</head>
+<body>
+  <main class="page" id="main">
+    <article class="prose">
+      <h1 class="display page-title">О проекте</h1>
+      <p>CaloTrack помогает понять, сколько калорий, белков, жиров и углеводов нужно в день, и показывает, как может выглядеть меню под эту норму.</p>
+
+      <h2>Что умеет</h2>
+      <ul>
+        <li>Считает дневную норму калорий по формуле Миффлина — Сан-Жеора с учётом активности и цели.</li>
+        <li>Делит норму на белки, жиры и углеводы.</li>
+        <li>Составляет примерное меню на день и позволяет заменить любое блюдо.</li>
+        <li>Показывает примерный прогноз веса на 12 месяцев.</li>
+        <li>Хранит историю расчётов и сохранённые меню в браузере.</li>
+        <li>Поддерживает светлую и тёмную тему.</li>
+      </ul>
+
+      <h2>Как устроен</h2>
+      <p>Это статический сайт на HTML, CSS и JavaScript без сборки и внешних библиотек. Данные пользователя не отправляются на сервер — они остаются в localStorage браузера.</p>
+
+      <h2>Обратная связь</h2>
+      <p>Исходный код открыт на <a href="https://github.com/reshapiz/calotrack">GitHub</a>. Там же можно сообщить об ошибке или предложить улучшение.</p>
+
+      <h2>Лицензия</h2>
+      <p>Код распространяется по лицензии MIT. Шрифты Onest и Nunito — по лицензии SIL Open Font License, файлы лицензий лежат в папке <code>fonts</code>.</p>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <p>Ещё на сайте: <a href="index.html">главная</a>, <a href="calculator.html">расчёт нормы</a>, <a href="proteins.html">белки</a>, <a href="fats.html">жиры</a>, <a href="carbs.html">углеводы</a> и <a href="history.html">история</a>.</p>
+    <p>Считаем приблизительно — это не замена врачу. Подробнее: <a href="privacy.html">конфиденциальность</a> и <a href="terms.html">условия использования</a>. <button class="theme-toggle" type="button" hidden></button></p>
+  </footer>
+
+
+</body>
+</html>
